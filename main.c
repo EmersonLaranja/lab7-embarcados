@@ -1,9 +1,8 @@
 #include "efm32gg990f1024.h"
 // #include "em_chip.h" // required for CHIP_Init() function
 
-#define LED_PORT 4 // gpioPortE
-#define LED_PIN0 2 // LED0 is connected to PortE pin2
-// #define LED_PIN1 3                // LED1 is connected to PortE pin3
+#define LED_PORT 4                // gpioPortE
+#define LED_PIN0 2                // LED0 is connected to PortE pin2
 #define TOP_VAL_PWM 1000          // sets PWM frequency to 1kHz (1MHz timer clock)
 #define TOP_VAL_GP_TIMER 1000     // sets general purpose timer overflow frequency to 1kHz (1MHz timer clock)
 #define UPDATE_PERIOD 250         // update compare value and toggle LED1 every 250ms
@@ -18,18 +17,27 @@ void TIMER0_IRQHandler(void)
     ms_counter++;    // Increment Counter
 }
 
+void Delay(uint32_t delay)
+{
+    volatile uint32_t counter;
+    int i;
+
+    for (i = 0; i < delay; i++)
+    {
+        counter = 1000;
+        while (counter)
+            counter--;
+    }
+}
+
 int main()
 {
-
     uint16_t compare_val = 0; // Initial PWM duty cycle is 0% (LED0 off)
     uint8_t inc = 1;          // Increment = true
-
-    // CHIP_Init(); // This function addresses some chip errata and should be called at the start of every EFM32 application (need em_system.c)
 
     CMU->HFRCOCTRL = 0x8;                               // Set High Freq. RC Osc. to 1 MHz and use as system source
     CMU->HFPERCLKEN0 = (1 << 13) | (1 << 8) | (1 << 5); // Enable GPIO, Timer0, and Timer3 peripheral clocks
     GPIO->P[LED_PORT].MODEL = (4 << 12) | (4 << 8);     // Configure LED0 and LED1 pins as digital outputs (push-pull)
-    // GPIO->P[LED_PORT].DOUTSET = (1 << LED_PIN1);        // Turn on LED1 (PE3)
 
     TIMER0->TOP = TOP_VAL_GP_TIMER; // GP Timer period will be 1ms = 1kHz freq
     TIMER3->TOP = TOP_VAL_PWM;      // PWM period will be 1ms = 1kHz freq
@@ -54,27 +62,15 @@ int main()
 
     while (1)
     {
-        if (ms_counter == UPDATE_PERIOD)
+        for (int i = 0; i <= 250; i++)
         {
-            if (inc)
-            {                           // If increment = true
-                compare_val += INC_VAL; // Increase the compare value
-            }
-            else
-            {                           // If increment = false
-                compare_val -= INC_VAL; // Decrease the compare value
-            }
-            TIMER3->CC[2].CCVB = compare_val; // Write new value to compare buffer
-            // GPIO->P[LED_PORT].DOUTTGL = (1 << LED_PIN1); // Toggle LED1
-            ms_counter = 0; // Reset counter
+            TIMER3->CC[2].CCVB = i;
+            Delay(1);
         }
-        if (compare_val > (TOP_VAL_PWM - 1))
+        for (int i = 250; i >= 0; i--)
         {
-            inc = 0;
-        } // If compare value is at max, start decrementing
-        if (compare_val < 1)
-        {
-            inc = 1;
-        } // If compare value is at min, start incrementing
+            TIMER3->CC[2].CCVB = i;
+            Delay(1);
+        }
     }
 }
