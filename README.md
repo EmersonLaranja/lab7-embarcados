@@ -1,64 +1,75 @@
-22 PWM Generation
-=================
+1 First Blink
+=============
 
-# PWM Generation
+This is the 1th version of Blink. It uses direct access to register of the EFM32GG990F1024 microcontroller on the EFM32STK3700 board.
 
+It is possible to use the Gecko SDK Library, which includes a HAL Library for GPIO. For didactic reasons and to avoid the restrictions imposed by the license, the direct access to registers is used in this project.
 
-The EFM32GG-STk3700 board has 4 timers, that can be used to generate PWM signals.
-Each timer has three channels, numbered 0, 1 and 2. Each channel output can be connected to
-an external pin as shown in the table below according the LOCATION field in ROUTE register.
-It is not possible to route the channel outputs independently. The LOCATION field specify the
-route used by the timer unit.
+The architecture of the software is shown below.
 
-| Timer  | Channel |  0 |  1 |  2 |  3 |  4 |  5 |  6 |  7 |
-|--------|---------|----|----|----|----|----|----|----|----|
-|TIMER0  | CC0     |PA0 |PA0 |PF6 |PD1 |PA0 |PF0 |    |    |
-|TIMER0  | CC1     |PA1 |PA1 |PF7 |PD2 |PC0 |PF1 |    |    |
-|TIMER0  | CC2     |PA2 |PA2 |PF8 |PD3 |PC1 |PF2 |    |    |
-|TIMER1  | CC0     |    |PE10|PB0 |PB7 |PD6 |    |    |    |
-|TIMER1  | CC1     |    |PE11|PB1 |PB8 |PD7 |    |    |    |
-|TIMER1  | CC2     |    |PE12|PB2 |PB11|    |    |    |    |
-|TIMER2  | CC0     |PA8 |PA12|PC8 |    |    |    |    |    |
-|TIMER2  | CC1     |PA9 |PA13|PC9 |    |    |    |    |    |
-|TIMER2  | CC2     |PA10|PA14|PC10|    |    |    |    |    |
-|TIMER3  | CC0     |PE14|PE0 |    |    |    |    |    |    |
-|TIMER3  | CC1     |PE15|PE1 |    |    |    |    |    |    |
-|TIMER3  | CC2     |PA15|PE2 |    |    |    |    |    |    |
+    +------------------------------------------------------+
+    |                     Application                      |
+    +------------------------------------------------------+
+    |                      Hardware                        |
+    +------------------------------------------------------+
+    
 
+To access the registers, it is necessary to know their addresses and fields. These information can be found in the data sheet and other documents from the manufacturer. The manufacturer (Silicon Labs) provides a CMSIS compatible header files in the *platform* folder of the Gecko SDK Library.
 
-From the Reference Manual (Section 32.3.4 Alternate Functions)
+The *platform* folder has the following sub-folders of interest: *Device* and *CMSIS*. In the *Device/SiliconLabs/EFM32GG/Include/* folder there is a header file named *emf32gg990f1024.h*, which includes the definition of all registers of the microcontroller. One has to be careful because it includes a lot of other header files (*emf32gg_*.h*). It is possible to include the *emf32gg990f1024.h* file directly in the code, like below.
 
-> Alternate functions are connections to pins from Timers, USARTs etc. These modules contain route
-> registers, where the pin connections are enabled. In addition, these registers contain a location
-> bit field, which configures which pins the outputs of that module will be connected to if they are
-> enabled. If an alternate signal output is enabled for a pin and output is enabled for the pin, the
-> alternate function’s output data and output enable signals override the data output and output
-> enable signals from the GPIO. However, the pin configuration stays as set in GPIO_Px_MODEL,
-> GPIO_Px_MODEH and GPIO_Px_DOUT registers. I.e. the pin configuration must be set to output enable
-> in GPIO for a peripheral to be able to use the pin as an output. <br />It is possible, but not
-> recommended to select two or more peripherals as output on the same pin. These signals will then
-> be OR'ed together. However, TIMER CCx and CDTIx outputs, which are routed as alternate functions,
-> have priority, and will never be OR'ed with other alternate functions. The reader is referred to
-> the pin map section of the device datasheet for more information on the possible locations
-> of each alternate function and any priority settings.
+    #include <emf32gg990f1024.h>
 
-From Section 20.3.6 GPIO Input/Output
+But a better alternative is to use a generic include and define which microcontroller is used as a parameter in the command line (actually a definition of a preprocessor symbol).
 
-> The TIMn_CCx inputs/outputs and TIM0_CDTIx outputs are accessible as alternate functions through
-> GPIO. Each pin connection can be enabled/disabled separately by setting the corresponding CCxPEN
-> or CDTIxPEN bits in TIMERn_ROUTE. The LOCATION bits in the same register can be used to move
-> all enabled pins to alternate pins.
+    #include "em_device.h"
 
+The command line must then include the *-DEMF32GG990F1024* parameter. To use this alternative one, has to copy the *em_device.h* to the project folder and used quote marks (“”) instead of angle brackets (<>) in the include line.
 
-##ROUTE Register
+Instead of using symbols like *0x2* to access the bit to control the *LED1*, it is better to use a symbol LED1 as below.
 
+    #define LED1 0x2
 
-References
-----------
+To define it, a common idiom is to use a BIT macro defined as below (the parenthesis are recommended to avoid surprises).
+   
+    #define BIT(N) (1<<(N))
 
-[EMF32GG Reference Manual](https://www.silabs.com/documents/public/reference-manuals/EFM32GG-RM.pdf)
+The symbols to access the LEDs in the GPIO Port E registers can then be defined as
 
-[EFM32GG990 Data Sheet](https://www.silabs.com/documents/public/data-sheets/efm32gg-datasheet.pdf)
+    #define LED1 BIT(2)
+    #define LED2 BIT(3)
 
-[AN0021](https://www.silabs.com/documents/public/application-notes/AN0021.pdf)
+To use the GPIO Port, where the LEDs are attached, it is necessary to:
 
+-   Enable clock for peripherals
+-   Enable clock for GPIO
+-   Configure pins as outputs
+-   Set them to the desired values
+
+To enable clock for peripherals, the *HFPERCLKEN* bit in the *HFPERCLKDIV* register must be set. To enable clock for the GPIO, the *GPIO* bit of the *HFPERCLKNE0* register must be set. Both of them are done by or'ing the mask already defined in the header files to the registers.
+
+    /* Enable Clock for GPIO */
+    CMU->HFPERCLKDIV |= CMU_HFPERCLKDIV_HFPERCLKEN; // Enable HFPERCLK
+    CMU->HFPERCLKEN0 |= CMU_HFPERCLKEN0_GPIO; // Enable HFPERCKL for GPIO
+    
+To access the register for GPIO Port E, a constant is defined, that points to the corresponding memory address.
+
+    GPIO_P_TypeDef * const GPIOE = &(GPIO->P[4]); // GPIOE
+
+To configure the pins as outputs one has to set the mode fields in the MODE registers. There are two MODE registers: *MODEL* to configure pins 0 to 7 and *MODEH*, for pins 8 to 15. To drive the LEDs, the fields must be set to Push-Pull configuration, but just or a binary value is not enough. The field must be cleared (set to 0) before.
+
+    /* Configure Pins in GPIOE */
+    GPIOE->MODEL &= ~(_GPIO_P_MODEL_MODE2_MASK|_GPIO_P_MODEL_MODE3_MASK); // Clear bits
+    GPIOE->MODEL |= (GPIO_P_MODEL_MODE2_PUSHPULL|GPIO_P_MODEL_MODE3_PUSHPULL); // Set bits
+    
+Finally, to set the desired value, one can or a value with a bit 1 in the desired position and all other bits set to 0.
+
+    GPIOE->DOUT |= LED1;
+
+To clear it, one must AND a value with a bit 0 in the desired position and all other bit set to 1
+
+    GPIOE->DOUT &= ~LED1;
+
+To toggle a bin, one can XOR a value with a bit 1 in the desired position (and other bits set to 0).
+
+    GPIOE->DOUT ^= LED1;
