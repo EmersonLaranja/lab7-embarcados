@@ -5,6 +5,13 @@
 #define TOP_VAL_PWM 1000      // sets PWM frequency to 1kHz (1MHz timer clock)
 #define TOP_VAL_GP_TIMER 1000 // sets general purpose timer overflow frequency to 1kHz (1MHz timer clock)
 
+#define SWITCH_PORT_D 3 // PORT D
+#define SWITCH_PORT_C 2 // PORT C
+#define PD0 0           // PD0
+#define PD1 1           // PD1
+#define PD2 2           // PD2
+#define PC0 0           // PC0
+
 void Delay(uint32_t delay)
 {
     volatile uint32_t counter;
@@ -18,7 +25,7 @@ void Delay(uint32_t delay)
     }
 }
 
-void ConfigSystem()
+void Config_LED_PWM()
 {
     CMU->HFRCOCTRL = 0x8;                               // Set High Freq. RC Osc. to 1 MHz and use as system source
     CMU->HFPERCLKEN0 = (1 << 13) | (1 << 8) | (1 << 5); // Enable GPIO, Timer0, and Timer3 peripheral clocks
@@ -40,21 +47,90 @@ void ConfigSystem()
     TIMER3->CMD = 0x1; // Start Timer3
 }
 
+void Config_INPUT_PORTS()
+{
+    // Configure PD1 as switch input
+    GPIO->P[SWITCH_PORT_D].MODEL = (4 << 0) | (4 << 4) | (4 << 8);
+    GPIO->P[SWITCH_PORT_D].DOUTSET = (1 << PD0) | (1 << PD1) | (1 << PD2); // Enable Pull-ups
+
+    // Configure PC0 as input
+    GPIO->P[SWITCH_PORT_C].MODEL = (4 << 0);
+    GPIO->P[SWITCH_PORT_C].DOUTSET = (1 << PC0); // Enable Pull-ups
+}
+
+void brightness(int chave0, int chave1, int chave2, int chave3)
+{
+    if (chave0 && chave1 && chave2 && chave3)
+    {
+        TIMER3->CC[2].CCVB = 0;
+    }
+    else if (!chave0 && chave1 && chave2 && chave3)
+    {
+        TIMER3->CC[2].CCVB = 16;
+    }
+    else if (chave0 && !chave1 && chave2 && chave3)
+    {
+        TIMER3->CC[2].CCVB = 32;
+    }
+    else if (chave0 && chave1 && !chave2 && chave3)
+    {
+        TIMER3->CC[2].CCVB = 48;
+    }
+    else if (chave0 && chave1 && chave2 && !chave3)
+    {
+        TIMER3->CC[2].CCVB = 64;
+    }
+    else if (!chave0 && !chave1 && chave2 && chave3)
+    {
+        TIMER3->CC[2].CCVB = 80;
+    }
+    else if (!chave0 && chave1 && !chave2 && chave3)
+    {
+        TIMER3->CC[2].CCVB = 96;
+    }
+    else if (!chave0 && chave1 && chave2 && !chave3)
+    {
+        TIMER3->CC[2].CCVB = 112;
+    }
+    else if (!chave0 && !chave1 && !chave2 && chave3)
+    {
+        TIMER3->CC[2].CCVB = 128;
+    }
+    else if (!chave0 && !chave1 && chave2 && !chave3)
+    {
+        TIMER3->CC[2].CCVB = 144;
+    }
+    else if (!chave0 && chave1 && !chave2 && !chave3)
+    {
+        TIMER3->CC[2].CCVB = 160;
+    }
+    else if (chave0 && !chave1 && !chave2 && chave3)
+    {
+        TIMER3->CC[2].CCVB = 176;
+    }
+    else if (chave0 && !chave1 && chave2 && !chave3)
+    {
+        TIMER3->CC[2].CCVB = 192;
+    }
+    else if (chave0 && chave1 && !chave2 && !chave3)
+    {
+        TIMER3->CC[2].CCVB = 208;
+    }
+    else if (!chave0 && !chave1 && !chave2 && !chave3)
+    {
+        TIMER3->CC[2].CCVB = 255;
+    }
+}
+
 int main()
 {
-    ConfigSystem();
+    Config_LED_PWM();
+    Config_INPUT_PORTS();
+
+    int statusCS = 0;
 
     while (1)
     {
-        for (int i = 0; i <= 250; i++)
-        {
-            TIMER3->CC[2].CCVB = i;
-            Delay(1);
-        }
-        for (int i = 250; i >= 0; i--)
-        {
-            TIMER3->CC[2].CCVB = i;
-            Delay(1);
-        }
+        brightness(GPIO->P[SWITCH_PORT_D].DIN & (1 << PD0), GPIO->P[SWITCH_PORT_D].DIN & (1 << PD1), GPIO->P[SWITCH_PORT_D].DIN & (1 << PD2), GPIO->P[SWITCH_PORT_C].DIN & (1 << PC0));
     }
 }
